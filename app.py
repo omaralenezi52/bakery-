@@ -3,12 +3,20 @@ from flask import Flask, render_template, request, redirect, url_for, session, f
 from functools import wraps
 from datetime import datetime, timedelta
 import random
+import os
 
-app = Flask(__name__)
+# إعداد مسارات المجلدات لضمان عملها على السيرفر (Render)
+base_dir = os.path.abspath(os.path.dirname(__file__))
+template_dir = os.path.join(base_dir, 'templates')
+static_dir = os.path.join(base_dir, 'static')
+db_path = os.path.join(base_dir, 'database.db')
+
+app = Flask(__name__, template_folder=template_dir, static_folder=static_dir)
 app.secret_key = 'bakery_legendary_key_2026'
 
 def get_db_connection():
-    conn = sqlite3.connect('database.db')
+    # استخدام المسار المطلق لقاعدة البيانات
+    conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
     return conn
 
@@ -59,18 +67,16 @@ def init_db():
         conn.executemany('INSERT INTO products (title, description, price, cost, image_url, category, badge) VALUES (?, ?, ?, ?, ?, ?, ?)', products_data)
         
         # إنشاء بيانات مبيعات وهمية للـ 30 يوم الماضية
-        conn.execute('DELETE FROM sales')
         product_ids = [row[0] for row in conn.execute('SELECT id FROM products').fetchall()]
         
         for days_ago in range(30, 0, -1):
             sale_date = datetime.now() - timedelta(days=days_ago)
-            # عدد مبيعات عشوائي في اليوم (3-15 عملية)
             daily_sales = random.randint(3, 15)
             for _ in range(daily_sales):
                 product_id = random.choice(product_ids)
-                product = conn.execute('SELECT price FROM products WHERE id=?', (product_id,)).fetchone()
+                product_row = conn.execute('SELECT price FROM products WHERE id=?', (product_id,)).fetchone()
                 quantity = random.randint(1, 4)
-                unit_price = product['price']
+                unit_price = product_row['price']
                 total_price = unit_price * quantity
                 conn.execute(
                     'INSERT INTO sales (product_id, quantity, unit_price, total_price, sale_date) VALUES (?, ?, ?, ?, ?)',
@@ -80,6 +86,7 @@ def init_db():
     conn.commit()
     conn.close()
 
+# تهيئة قاعدة البيانات عند بدء التشغيل
 init_db()
 
 def login_required(f):
@@ -90,7 +97,8 @@ def login_required(f):
         return f(*args, **kwargs)
     return decorated_function
 
-# ===== الصفحة الرئيسية =====
+# ===== المسارات (Routes) =====
+
 @app.route('/')
 def index():
     conn = get_db_connection()
@@ -99,21 +107,19 @@ def index():
     conn.close()
     return render_template('index.html', products=products, categories=categories)
 
-# ===== صفحة المنتج =====
 @app.route('/product/<int:product_id>')
 def product_detail(product_id):
     conn = get_db_connection()
     product = conn.execute('SELECT * FROM products WHERE id=?', (product_id,)).fetchone()
     if not product:
+        conn.close()
         return redirect(url_for('index'))
     
-    # المنتجات المشابهة
     related = conn.execute(
         'SELECT * FROM products WHERE category=? AND id!=? LIMIT 4',
         (product['category'], product_id)
     ).fetchall()
     
-    # إحصائيات المنتج
     stats = conn.execute(
         'SELECT SUM(quantity) as total_sold, COUNT(*) as orders FROM sales WHERE product_id=?',
         (product_id,)
@@ -125,7 +131,6 @@ def product_detail(product_id):
     
     return render_template('product.html', product=product, related=related, total_sold=total_sold, orders=orders)
 
-# ===== تصفية المنتجات =====
 @app.route('/category/<cat>')
 def category(cat):
     conn = get_db_connection()
@@ -137,7 +142,6 @@ def category(cat):
     conn.close()
     return render_template('index.html', products=products, categories=categories, active_cat=cat)
 
-# ===== تسجيل الدخول =====
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
@@ -154,90 +158,47 @@ def logout():
     session.pop('logged_in', None)
     return redirect(url_for('index'))
 
-# ===== لوحة التحكم =====
 @app.route('/admin')
 @login_required
 def admin():
     conn = get_db_connection()
-    
-    # إجمالي المبيعات اليوم
     today = datetime.now().strftime('%Y-%m-%d')
-    today_sales = conn.execute(
-        "SELECT COALESCE(SUM(total_price),0) as total, COUNT(*) as count FROM sales WHERE date(sale_date)=?",
-        (today,)
-    ).fetchone()
+    today_sales = conn.execute("SELECT COALESCE(SUM(total_price),0) as total, COUNT(*) as count FROM sales WHERE date(sale_date)=?", (today,)).fetchone()
     
-    # مبيعات هذا الأسبوع
     week_ago = (datetime.now() - timedelta(days=7)).strftime('%Y-%m-%d')
-    week_sales = conn.execute(
-        "SELECT COALESCE(SUM(total_price),0) as total, COUNT(*) as count FROM sales WHERE date(sale_date)>=?",
-        (week_ago,)
-    ).fetchone()
+    week_sales = conn.execute("SELECT COALESCE(SUM(total_price),0) as total, COUNT(*) as count FROM sales WHERE date(sale_date)>=?", (week_ago,)).fetchone()
     
-    # مبيعات هذا الشهر
     month_ago = (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d')
-    month_sales = conn.execute(
-        "SELECT COALESCE(SUM(total_price),0) as total, COUNT(*) as count FROM sales WHERE date(sale_date)>=?",
-        (month_ago,)
-    ).fetchone()
+    month_sales = conn.execute("SELECT COALESCE(SUM(total_price),0) as total, COUNT(*) as count FROM sales WHERE date(sale_date)>=?", (month_ago,)).fetchone()
     
-    # إجمالي التكاليف (الشهر)
-    month_cost = conn.execute(
-        """SELECT COALESCE(SUM(s.quantity * p.cost),0) as total_cost 
-           FROM sales s JOIN products p ON s.product_id=p.id 
-           WHERE date(s.sale_date)>=?""",
-        (month_ago,)
-    ).fetchone()
+    month_cost_row = conn.execute("""SELECT COALESCE(SUM(s.quantity * p.cost),0) as total_cost FROM sales s JOIN products p ON s.product_id=p.id WHERE date(s.sale_date)>=?""", (month_ago,)).fetchone()
     
-    # أكثر المنتجات مبيعاً
-    top_products = conn.execute(
-        """SELECT p.title, p.image_url, p.price, p.category,
-                  SUM(s.quantity) as total_qty, SUM(s.total_price) as total_revenue
-           FROM products p LEFT JOIN sales s ON p.id=s.product_id
-           GROUP BY p.id ORDER BY total_qty DESC LIMIT 5""",
-    ).fetchall()
+    top_products = conn.execute("""SELECT p.title, p.image_url, p.price, p.category, SUM(s.quantity) as total_qty, SUM(s.total_price) as total_revenue FROM products p LEFT JOIN sales s ON p.id=s.product_id GROUP BY p.id ORDER BY total_qty DESC LIMIT 5""").fetchall()
     
-    # مبيعات آخر 7 أيام (للرسم البياني)
     daily_chart = []
     for i in range(6, -1, -1):
         day = (datetime.now() - timedelta(days=i)).strftime('%Y-%m-%d')
         day_label = (datetime.now() - timedelta(days=i)).strftime('%m/%d')
-        row = conn.execute(
-            "SELECT COALESCE(SUM(total_price),0) as revenue FROM sales WHERE date(sale_date)=?",
-            (day,)
-        ).fetchone()
+        row = conn.execute("SELECT COALESCE(SUM(total_price),0) as revenue FROM sales WHERE date(sale_date)=?", (day,)).fetchone()
         daily_chart.append({'day': day_label, 'revenue': round(row['revenue'], 2)})
     
-    # جميع المنتجات
     products = conn.execute('SELECT * FROM products ORDER BY created_at DESC').fetchall()
-    
-    # إجمالي عدد المنتجات
     total_products = conn.execute('SELECT COUNT(*) as c FROM products').fetchone()['c']
-    
     conn.close()
     
-    net_profit = round(month_sales['total'] - month_cost['total_cost'], 2)
+    net_profit = round(month_sales['total'] - month_cost_row['total_cost'], 2)
     avg_daily = round(month_sales['total'] / 30, 2) if month_sales['total'] > 0 else 0
     avg_weekly = round(month_sales['total'] / 4, 2) if month_sales['total'] > 0 else 0
     
     return render_template('admin.html',
-        today_revenue=round(today_sales['total'], 2),
-        today_orders=today_sales['count'],
-        week_revenue=round(week_sales['total'], 2),
-        week_orders=week_sales['count'],
-        month_revenue=round(month_sales['total'], 2),
-        month_orders=month_sales['count'],
-        month_cost=round(month_cost['total_cost'], 2),
-        net_profit=net_profit,
-        avg_daily=avg_daily,
-        avg_weekly=avg_weekly,
-        top_products=top_products,
-        daily_chart=daily_chart,
-        products=products,
-        total_products=total_products
+        today_revenue=round(today_sales['total'], 2), today_orders=today_sales['count'],
+        week_revenue=round(week_sales['total'], 2), week_orders=week_sales['count'],
+        month_revenue=round(month_sales['total'], 2), month_orders=month_sales['count'],
+        month_cost=round(month_cost_row['total_cost'], 2), net_profit=net_profit,
+        avg_daily=avg_daily, avg_weekly=avg_weekly, top_products=top_products,
+        daily_chart=daily_chart, products=products, total_products=total_products
     )
 
-# ===== إضافة منتج =====
 @app.route('/admin/add', methods=['POST'])
 @login_required
 def add_product():
@@ -246,51 +207,44 @@ def add_product():
     price = float(request.form['price'])
     cost = float(request.form.get('cost', 0))
     image_url = request.form['image_url']
-    category = request.form.get('category', 'عام')
+    category_val = request.form.get('category', 'عام')
     badge = request.form.get('badge', '')
     
     conn = get_db_connection()
-    conn.execute(
-        'INSERT INTO products (title, description, price, cost, image_url, category, badge) VALUES (?, ?, ?, ?, ?, ?, ?)',
-        (title, description, price, cost, image_url, category, badge)
-    )
+    conn.execute('INSERT INTO products (title, description, price, cost, image_url, category, badge) VALUES (?, ?, ?, ?, ?, ?, ?)',
+                 (title, description, price, cost, image_url, category_val, badge))
     conn.commit()
     conn.close()
     flash(f'تم إضافة "{title}" بنجاح! 🎉', 'success')
     return redirect(url_for('admin'))
 
-# ===== حذف منتج =====
 @app.route('/admin/delete/<int:product_id>', methods=['POST'])
 @login_required
 def delete_product(product_id):
     conn = get_db_connection()
-    product = conn.execute('SELECT title FROM products WHERE id=?', (product_id,)).fetchone()
     conn.execute('DELETE FROM products WHERE id=?', (product_id,))
     conn.commit()
     conn.close()
     flash(f'تم حذف المنتج بنجاح', 'success')
     return redirect(url_for('admin'))
 
-# ===== تسجيل بيع (API) =====
 @app.route('/api/buy/<int:product_id>', methods=['POST'])
 def buy_product(product_id):
     conn = get_db_connection()
-    product = conn.execute('SELECT * FROM products WHERE id=?', (product_id,)).fetchone()
-    if not product:
+    product_row = conn.execute('SELECT * FROM products WHERE id=?', (product_id,)).fetchone()
+    if not product_row:
+        conn.close()
         return jsonify({'error': 'منتج غير موجود'}), 404
     
     quantity = int(request.json.get('quantity', 1))
-    total = product['price'] * quantity
+    total = product_row['price'] * quantity
     
-    conn.execute(
-        'INSERT INTO sales (product_id, quantity, unit_price, total_price) VALUES (?, ?, ?, ?)',
-        (product_id, quantity, product['price'], total)
-    )
+    conn.execute('INSERT INTO sales (product_id, quantity, unit_price, total_price) VALUES (?, ?, ?, ?)',
+                 (product_id, quantity, product_row['price'], total))
     conn.commit()
     conn.close()
     return jsonify({'success': True, 'message': 'تم إضافة المنتج للسلة! 🛒'})
 
-# ===== API بيانات الرسم البياني =====
 @app.route('/api/chart-data')
 @login_required
 def chart_data():
@@ -300,18 +254,12 @@ def chart_data():
     for i in range(days-1, -1, -1):
         day = (datetime.now() - timedelta(days=i)).strftime('%Y-%m-%d')
         label = (datetime.now() - timedelta(days=i)).strftime('%d/%m')
-        row = conn.execute(
-            "SELECT COALESCE(SUM(total_price),0) as revenue, COUNT(*) as orders FROM sales WHERE date(sale_date)=?",
-            (day,)
-        ).fetchone()
+        row = conn.execute("SELECT COALESCE(SUM(total_price),0) as revenue, COUNT(*) as orders FROM sales WHERE date(sale_date)=?", (day,)).fetchone()
         data.append({'day': label, 'revenue': round(row['revenue'],2), 'orders': row['orders']})
     conn.close()
     return jsonify(data)
-import os
 
+# تشغيل السيرفر مع ضبط البورت المتوافق مع Render
 if __name__ == '__main__':
-    # الحصول على البورت من السيرفر (Render) أو استخدام 5000 كافتراضي للجهاز المحلي
     port = int(os.environ.get('PORT', 5000))
-    # تشغيل السيرفر مع تحديد الهوست والبورت
-    # debug=True تستخدم فقط في جهازك؛ في السيرفر الحقيقي يفضل وضعها False
-    app.run(host='0.0.0.0', port=port, debug=True)
+    app.run(host='0.0.0.0', port=port, debug=False)
