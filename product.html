@@ -1,0 +1,159 @@
+{% extends "base.html" %}
+{% block title %}{{ product['title'] }} — حلويات لمسة{% endblock %}
+
+{% block content %}
+<div class="product-detail-page">
+    
+    <!-- Breadcrumb -->
+    <div class="breadcrumb">
+        <a href="{{ url_for('index') }}">الرئيسية</a>
+        <span>›</span>
+        <a href="{{ url_for('category', cat=product['category']) }}">{{ product['category'] }}</a>
+        <span>›</span>
+        <span>{{ product['title'] }}</span>
+    </div>
+
+    <!-- Product Main -->
+    <div class="product-main">
+        <div class="product-gallery">
+            <div class="product-img-main">
+                <img src="{{ product['image_url'] }}" alt="{{ product['title'] }}" id="mainImg">
+                {% if product['badge'] %}
+                <span class="product-badge-large">{{ product['badge'] }}</span>
+                {% endif %}
+            </div>
+            <div class="product-img-thumbs">
+                <div class="thumb active" onclick="changeImg(this, '{{ product['image_url'] }}')">
+                    <img src="{{ product['image_url'] }}" alt="">
+                </div>
+            </div>
+        </div>
+
+        <div class="product-info-panel">
+            <span class="product-category-tag">{{ product['category'] }}</span>
+            <h1 class="product-name">{{ product['title'] }}</h1>
+            
+            <!-- Rating Stars -->
+            <div class="product-rating">
+                <div class="stars">⭐⭐⭐⭐⭐</div>
+                <span class="rating-text">{{ total_sold }} وحدة مباعة · {{ orders }} طلب</span>
+            </div>
+
+            <p class="product-description">{{ product['description'] }}</p>
+
+            <!-- Price Block -->
+            <div class="product-price-block">
+                <span class="product-price-main">{{ product['price'] }}</span>
+                <span class="product-price-currency">ريال سعودي</span>
+            </div>
+
+            <!-- Quantity Selector -->
+            <div class="quantity-block">
+                <label>الكمية:</label>
+                <div class="qty-selector">
+                    <button onclick="changeQty(-1)">−</button>
+                    <span id="qtyDisplay">1</span>
+                    <button onclick="changeQty(1)">+</button>
+                </div>
+                <span class="qty-total" id="qtyTotal">المجموع: <strong>{{ product['price'] }} ريال</strong></span>
+            </div>
+
+            <!-- CTA Buttons -->
+            <div class="product-cta">
+                <button class="btn-buy-now" onclick="buyNow({{ product['id'] }}, '{{ product['title'] }}', {{ product['price'] }}, '{{ product['image_url'] }}')">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/></svg>
+                    أضف للسلة
+                </button>
+                <button class="btn-wishlist" title="إضافة للمفضلة">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+                </button>
+            </div>
+
+            <!-- Delivery Info -->
+            <div class="delivery-info">
+                <div class="delivery-item">
+                    <span>🚀</span>
+                    <div>
+                        <strong>توصيل خلال ساعتين</strong>
+                        <small>الرياض وضواحيها</small>
+                    </div>
+                </div>
+                <div class="delivery-item">
+                    <span>🎁</span>
+                    <div>
+                        <strong>تغليف هدية مجاناً</strong>
+                        <small>مع بطاقة تهنئة مخصصة</small>
+                    </div>
+                </div>
+                <div class="delivery-item">
+                    <span>✅</span>
+                    <div>
+                        <strong>ضمان الجودة</strong>
+                        <small>أو استرداد كامل</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Related Products -->
+    {% if related %}
+    <section class="related-section">
+        <div class="section-header">
+            <span class="section-tag">مقترحات</span>
+            <h2 class="section-title">قد يعجبك أيضاً</h2>
+        </div>
+        <div class="related-grid">
+            {% for item in related %}
+            <a href="{{ url_for('product_detail', product_id=item['id']) }}" class="related-card">
+                <div class="related-img">
+                    <img src="{{ item['image_url'] }}" alt="{{ item['title'] }}">
+                </div>
+                <div class="related-info">
+                    <h4>{{ item['title'] }}</h4>
+                    <span>{{ item['price'] }} ريال</span>
+                </div>
+            </a>
+            {% endfor %}
+        </div>
+    </section>
+    {% endif %}
+
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+let currentQty = 1;
+const basePrice = {{ product['price'] }};
+const productId = {{ product['id'] }};
+const productTitle = "{{ product['title'] }}";
+const productImg = "{{ product['image_url'] }}";
+
+function changeQty(delta) {
+    currentQty = Math.max(1, currentQty + delta);
+    document.getElementById('qtyDisplay').textContent = currentQty;
+    document.getElementById('qtyTotal').innerHTML = `المجموع: <strong>${(basePrice * currentQty).toFixed(2)} ريال</strong>`;
+}
+
+function changeImg(el, src) {
+    document.getElementById('mainImg').src = src;
+    document.querySelectorAll('.thumb').forEach(t => t.classList.remove('active'));
+    el.classList.add('active');
+}
+
+function buyNow(id, title, price, img) {
+    for (let i = 0; i < currentQty; i++) {
+        addToCart(id, title, price, img);
+    }
+    // Register sale
+    fetch(`/api/buy/${id}`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({quantity: currentQty})
+    });
+    toggleCart();
+}
+</script>
+{% endblock %}

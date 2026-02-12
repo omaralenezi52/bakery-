@@ -1,0 +1,303 @@
+{% extends "base.html" %}
+{% block title %}لوحة التحكم — حلويات لمسة{% endblock %}
+
+{% block content %}
+<div class="admin-page">
+
+    <div class="admin-header">
+        <div>
+            <span class="admin-greeting">مرحباً بك 👋</span>
+            <h1 class="admin-title">لوحة تحكم لمسة</h1>
+            <p class="admin-subtitle">إدارة المتجر والتحليلات والمنتجات</p>
+        </div>
+        <div class="admin-header-actions">
+            <button class="btn-primary" onclick="document.getElementById('addModal').style.display='flex'">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                إضافة منتج جديد
+            </button>
+        </div>
+    </div>
+
+    <div class="kpi-grid">
+        <div class="kpi-card kpi-today">
+            <div class="kpi-icon">☀️</div>
+            <div class="kpi-data">
+                <span class="kpi-label">مبيعات اليوم</span>
+                <strong class="kpi-value">{{ today_revenue }} <small>ر.س</small></strong>
+                <span class="kpi-sub">{{ today_orders }} طلب</span>
+            </div>
+        </div>
+        <div class="kpi-card kpi-week">
+            <div class="kpi-icon">📅</div>
+            <div class="kpi-data">
+                <span class="kpi-label">مبيعات الأسبوع</span>
+                <strong class="kpi-value">{{ week_revenue }} <small>ر.س</small></strong>
+                <span class="kpi-sub">{{ week_orders }} طلب</span>
+            </div>
+        </div>
+        <div class="kpi-card kpi-month">
+            <div class="kpi-icon">📊</div>
+            <div class="kpi-data">
+                <span class="kpi-label">مبيعات الشهر</span>
+                <strong class="kpi-value">{{ month_revenue }} <small>ر.س</small></strong>
+                <span class="kpi-sub">{{ month_orders }} طلب</span>
+            </div>
+        </div>
+        <div class="kpi-card kpi-profit">
+            <div class="kpi-icon">💰</div>
+            <div class="kpi-data">
+                <span class="kpi-label">صافي الربح (شهر)</span>
+                <strong class="kpi-value {% if net_profit < 0 %}kpi-negative{% endif %}">{{ net_profit }} <small>ر.س</small></strong>
+                <span class="kpi-sub">التكاليف: {{ month_cost }} ر.س</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="secondary-kpis">
+        <div class="sec-kpi">
+            <span class="sec-icon">📈</span>
+            <div>
+                <strong>{{ avg_daily }} ريال</strong>
+                <small>متوسط الدخل اليومي</small>
+            </div>
+        </div>
+        <div class="sec-kpi">
+            <span class="sec-icon">📆</span>
+            <div>
+                <strong>{{ avg_weekly }} ريال</strong>
+                <small>متوسط الدخل الأسبوعي</small>
+            </div>
+        </div>
+        <div class="sec-kpi">
+            <span class="sec-icon">🏪</span>
+            <div>
+                <strong>{{ total_products }}</strong>
+                <small>منتج في المتجر</small>
+            </div>
+        </div>
+        <div class="sec-kpi">
+            <span class="sec-icon">💳</span>
+            <div>
+                <strong>{{ month_cost }} ريال</strong>
+                <small>إجمالي التكاليف (شهر)</small>
+            </div>
+        </div>
+    </div>
+
+    <div class="charts-row">
+        <div class="chart-card chart-big">
+            <div class="chart-header">
+                <h3>📈 إيرادات آخر 7 أيام</h3>
+                <div class="chart-controls">
+                    <button class="chart-btn active" onclick="loadChart(7, this)">7 أيام</button>
+                    <button class="chart-btn" onclick="loadChart(14, this)">14 يوم</button>
+                    <button class="chart-btn" onclick="loadChart(30, this)">30 يوم</button>
+                </div>
+            </div>
+            <canvas id="revenueChart" height="100"></canvas>
+        </div>
+
+        <div class="chart-card chart-small">
+            <div class="chart-header">
+                <h3>🏆 أكثر المنتجات مبيعاً</h3>
+            </div>
+            <div class="top-products-list">
+                {% for p in top_products %}
+                <div class="top-product-row">
+                    <span class="rank rank-{{ loop.index }}">{{ loop.index }}</span>
+                    <img src="{{ p['image_url'] }}" alt="{{ p['title'] }}">
+                    <div class="tp-info">
+                        <strong>{{ p['title'][:25] }}{% if p['title']|length > 25 %}...{% endif %}</strong>
+                        <small>{{ p['total_qty'] or 0 }} وحدة · {{ p['total_revenue']|round(0)|int if p['total_revenue'] else 0 }} ر.س</small>
+                    </div>
+                    <div class="tp-bar-wrap">
+                        <div class="tp-bar" style="width: {{ [(p['total_qty'] or 0) / [(top_products[0]['total_qty'] or 1), 1]|max * 100, 100]|min|int }}%"></div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <div class="products-management">
+        <div class="pm-header">
+            <h3>📦 إدارة المنتجات</h3>
+            <span class="pm-count">{{ total_products }} منتج</span>
+        </div>
+        <div class="pm-grid">
+            {% for product in products %}
+            <div class="pm-card">
+                <div class="pm-img">
+                    <img src="{{ product['image_url'] }}" alt="{{ product['title'] }}">
+                    {% if product['badge'] %}
+                    <span class="pm-badge">{{ product['badge'] }}</span>
+                    {% endif %}
+                </div>
+                <div class="pm-info">
+                    <span class="pm-category">{{ product['category'] }}</span>
+                    <h4>{{ product['title'] }}</h4>
+                    <div class="pm-prices">
+                        <span class="pm-price">{{ product['price'] }} ر.س</span>
+                        <span class="pm-cost">تكلفة: {{ product['cost'] }} ر.س</span>
+                        <span class="pm-margin">هامش: {{ ((product['price'] - product['cost']) / product['price'] * 100)|round(0)|int }}%</span>
+                    </div>
+                </div>
+                <div class="pm-actions">
+                    <a href="{{ url_for('product_detail', product_id=product['id']) }}" class="pm-btn pm-view" target="_blank">عرض</a>
+                    <form method="POST" action="{{ url_for('delete_product', product_id=product['id']) }}" onsubmit="return confirm('هل تريد حذف هذا المنتج؟')">
+                        <button type="submit" class="pm-btn pm-delete">حذف</button>
+                    </form>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+</div>
+
+<div class="modal-overlay" id="addModal" style="display:none" onclick="if(event.target===this)this.style.display='none'">
+    <div class="modal-box">
+        <div class="modal-header">
+            <h3>🍰 إضافة منتج جديد</h3>
+            <button onclick="document.getElementById('addModal').style.display='none'" class="modal-close">✕</button>
+        </div>
+        <form method="POST" action="{{ url_for('add_product') }}" class="modal-form">
+            <div class="form-row">
+                <div class="form-field">
+                    <label>اسم المنتج *</label>
+                    <input type="text" name="title" placeholder="مثال: كب كيك شوكولاتة" required>
+                </div>
+                <div class="form-field">
+                    <label>الفئة</label>
+                    <select name="category">
+                        <option value="كيكات">كيكات</option>
+                        <option value="كب كيك">كب كيك</option>
+                        <option value="تارت">تارت</option>
+                        <option value="مافن">مافن</option>
+                        <option value="مكرون">مكرون</option>
+                        <option value="مخبوزات">مخبوزات</option>
+                        <option value="عام">عام</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="form-field">
+                <label>وصف المنتج *</label>
+                <textarea name="description" rows="3" placeholder="اكتب وصفاً شهياً يجذب العملاء..." required></textarea>
+            </div>
+
+            <div class="form-row">
+                <div class="form-field">
+                    <label>سعر البيع (ريال) *</label>
+                    <input type="number" name="price" step="0.01" placeholder="0.00" required>
+                </div>
+                <div class="form-field">
+                    <label>تكلفة الإنتاج (ريال)</label>
+                    <input type="number" name="cost" step="0.01" placeholder="0.00" value="0">
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-field">
+                    <label>رابط الصورة *</label>
+                    <input type="url" name="image_url" placeholder="https://..." required>
+                </div>
+                <div class="form-field">
+                    <label>شارة المنتج</label>
+                    <input type="text" name="badge" placeholder="مثال: جديد، الأكثر مبيعاً">
+                </div>
+            </div>
+
+            <button type="submit" class="btn-primary btn-full">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                حفظ وإضافة للمتجر
+            </button>
+        </form>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Chart Data from server
+const chartLabels = {{ daily_chart | map(attribute='day') | list | tojson }};
+const chartRevenue = {{ daily_chart | map(attribute='revenue') | list | tojson }};
+
+let revenueChart;
+
+function initChart(labels, data) {
+    const ctx = document.getElementById('revenueChart').getContext('2d');
+    
+    if (revenueChart) revenueChart.destroy();
+    
+    const gradient = ctx.createLinearGradient(0, 0, 0, 300);
+    gradient.addColorStop(0, 'rgba(230, 126, 34, 0.3)');
+    gradient.addColorStop(1, 'rgba(230, 126, 34, 0)');
+    
+    revenueChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'الإيرادات (ريال)',
+                data: data,
+                borderColor: '#e67e22',
+                backgroundColor: gradient,
+                borderWidth: 3,
+                fill: true,
+                tension: 0.4,
+                pointBackgroundColor: '#e67e22',
+                pointBorderColor: '#fff',
+                pointBorderWidth: 2,
+                pointRadius: 5,
+                pointHoverRadius: 8,
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    backgroundColor: '#1a1a2e',
+                    titleColor: '#e67e22',
+                    bodyColor: '#fff',
+                    padding: 12,
+                    callbacks: {
+                        label: ctx => `${ctx.parsed.y} ريال`
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    grid: { color: 'rgba(0,0,0,0.05)' },
+                    ticks: {
+                        callback: v => v + ' ر.س',
+                        font: { family: 'Tajawal' }
+                    }
+                },
+                x: {
+                    grid: { display: false },
+                    ticks: { font: { family: 'Tajawal' } }
+                }
+            }
+        }
+    });
+}
+
+async function loadChart(days, btn) {
+    document.querySelectorAll('.chart-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    
+    const res = await fetch(`/api/chart-data?days=${days}`);
+    const data = await res.json();
+    const labels = data.map(d => d.day);
+    const revenues = data.map(d => d.revenue);
+    initChart(labels, revenues);
+}
+
+// Init on load
+initChart(chartLabels, chartRevenue);
+</script>
+{% endblock %}

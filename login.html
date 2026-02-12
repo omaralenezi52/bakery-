@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% block title %}دخول الإدارة — حلويات لمسة{% endblock %}
+
+{% block content %}
+<div class="login-page">
+    <div class="login-left">
+        <div class="login-visual">
+            <div class="login-blob lb-1"></div>
+            <div class="login-blob lb-2"></div>
+            <img src="https://images.unsplash.com/photo-1467003909585-2f8a72700288?q=80&w=600" alt="حلويات" class="login-img">
+            <div class="login-quote">
+                <span>🍮</span>
+                <p>"الحلويات ليست طعاماً، إنها عاطفة"</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="login-right">
+        <div class="login-box">
+            <div class="login-header">
+                <span class="login-logo">🍮</span>
+                <h1>لوحة تحكم لمسة</h1>
+                <p>مرحباً! سجّل دخولك لإدارة متجرك</p>
+            </div>
+
+            <form method="POST" class="login-form">
+                <div class="form-field">
+                    <label>اسم المستخدم</label>
+                    <div class="input-wrap">
+                        <span class="input-icon">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                        </span>
+                        <input type="text" name="username" placeholder="أدخل اسم المستخدم" required autocomplete="username">
+                    </div>
+                </div>
+
+                <div class="form-field">
+                    <label>كلمة المرور</label>
+                    <div class="input-wrap">
+                        <span class="input-icon">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+                        </span>
+                        <input type="password" name="password" id="pwdInput" placeholder="أدخل كلمة المرور" required autocomplete="current-password">
+                        <button type="button" class="toggle-pwd" onclick="togglePwd()">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" id="eyeIcon"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                        </button>
+                    </div>
+                </div>
+
+                <button type="submit" class="login-btn">
+                    <span>دخول للوحة التحكم</span>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h4a2 2 0 012 2v14a2 2 0 01-2 2h-4M10 17l5-5-5-5M15 12H3"/></svg>
+                </button>
+            </form>
+
+            <div class="login-hint">
+                <span>💡</span>
+                <p>البيانات الافتراضية: <strong>admin</strong> / <strong>12345</strong></p>
+            </div>
+
+            <a href="{{ url_for('index') }}" class="back-to-store">
+                ← العودة للمتجر
+            </a>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+function togglePwd() {
+    const input = document.getElementById('pwdInput');
+    input.type = input.type === 'password' ? 'text' : 'password';
+}
+</script>
+{% endblock %}

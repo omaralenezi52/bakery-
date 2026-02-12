@@ -1,0 +1,168 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<!-- Hero Section -->
+<section class="hero">
+    <div class="hero-bg">
+        <div class="hero-blob blob-1"></div>
+        <div class="hero-blob blob-2"></div>
+        <div class="hero-blob blob-3"></div>
+    </div>
+    <div class="hero-content">
+        <div class="hero-badge">🌟 مخبز فاخر في قلب الرياض</div>
+        <h1 class="hero-title">
+            كل قطعة<br>
+            <em>حكاية</em><br>
+            من السكر
+        </h1>
+        <p class="hero-subtitle">حلويات مصنوعة يدوياً بأجود المكونات الفرنسية، تُقدَّم بلمسة فنية تُسعد القلوب وتُبهج الأرواح</p>
+        <div class="hero-actions">
+            <a href="#products" class="btn-primary">اكتشف المتجر</a>
+            <a href="#categories" class="btn-ghost">تصفح الأصناف</a>
+        </div>
+        <div class="hero-stats">
+            <div class="stat">
+                <strong>500+</strong>
+                <span>عميل سعيد</span>
+            </div>
+            <div class="stat-divider"></div>
+            <div class="stat">
+                <strong>50+</strong>
+                <span>صنف فاخر</span>
+            </div>
+            <div class="stat-divider"></div>
+            <div class="stat">
+                <strong>5★</strong>
+                <span>تقييم العملاء</span>
+            </div>
+        </div>
+    </div>
+    <div class="hero-visual">
+        <div class="hero-img-wrapper">
+            <img src="https://images.unsplash.com/photo-1578985545062-69928b1d9587?q=80&w=700" alt="كيكة فاخرة" class="hero-img">
+            <div class="hero-float-card card-top">
+                <span>🔥</span>
+                <div>
+                    <strong>الأكثر طلباً</strong>
+                    <small>كيكة الشوكولاتة الألمانية</small>
+                </div>
+            </div>
+            <div class="hero-float-card card-bottom">
+                <span>✨</span>
+                <div>
+                    <strong>وصل حديثاً</strong>
+                    <small>مكرون الفستق الأخضر</small>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Categories Filter -->
+<section class="categories-section" id="categories">
+    <div class="section-container">
+        <div class="section-header">
+            <span class="section-tag">الأصناف</span>
+            <h2 class="section-title">تصفح حسب الصنف</h2>
+        </div>
+        <div class="categories-pills">
+            <a href="{{ url_for('index') }}" class="pill {% if not active_cat or active_cat == 'all' %}pill-active{% endif %}">
+                <span>🎂</span> الكل
+            </a>
+            {% for cat in categories %}
+            <a href="{{ url_for('category', cat=cat['category']) }}" 
+               class="pill {% if active_cat == cat['category'] %}pill-active{% endif %}">
+                {% if cat['category'] == 'كيكات' %}🎂
+                {% elif cat['category'] == 'كب كيك' %}🧁
+                {% elif cat['category'] == 'تارت' %}🥧
+                {% elif cat['category'] == 'مافن' %}🫐
+                {% elif cat['category'] == 'مكرون' %}🌈
+                {% elif cat['category'] == 'مخبوزات' %}🥐
+                {% else %}✨{% endif %}
+                {{ cat['category'] }}
+            </a>
+            {% endfor %}
+        </div>
+    </div>
+</section>
+
+<!-- Products Grid -->
+<section class="products-section" id="products">
+    <div class="section-container">
+        <div class="section-header">
+            <span class="section-tag">منتجاتنا</span>
+            <h2 class="section-title">قائمة الحلويات الفاخرة</h2>
+            <p class="section-desc">كل منتج يُعدّ بيدين ماهرتين وقلب يعشق الحلويات</p>
+        </div>
+        
+        {% if products %}
+        <div class="products-grid">
+            {% for product in products %}
+            <article class="product-card" onclick="openProductModal({{ product['id'] }})">
+                <div class="card-img-wrap">
+                    <img src="{{ product['image_url'] }}" alt="{{ product['title'] }}" loading="lazy">
+                    {% if product['badge'] %}
+                    <span class="card-badge">{{ product['badge'] }}</span>
+                    {% endif %}
+                    <div class="card-overlay">
+                        <button class="card-view-btn" onclick="event.stopPropagation(); window.location.href='{{ url_for('product_detail', product_id=product['id']) }}'">
+                            عرض التفاصيل ←
+                        </button>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <span class="card-category">{{ product['category'] }}</span>
+                    <h3 class="card-title">{{ product['title'] }}</h3>
+                    <p class="card-desc">{{ product['description'][:80] }}{% if product['description']|length > 80 %}...{% endif %}</p>
+                    <div class="card-footer">
+                        <span class="card-price">{{ product['price'] }} <small>ريال</small></span>
+                        <button class="card-add-btn" onclick="event.stopPropagation(); addToCart({{ product['id'] }}, '{{ product['title'] }}', {{ product['price'] }}, '{{ product['image_url'] }}')">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                            أضف
+                        </button>
+                    </div>
+                </div>
+            </article>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <span>🍰</span>
+            <h3>لا توجد منتجات حالياً</h3>
+            <p>يرجى الدخول للوحة التحكم وإضافة المنتجات</p>
+            <a href="{{ url_for('login') }}" class="btn-primary">دخول لوحة التحكم</a>
+        </div>
+        {% endif %}
+    </div>
+</section>
+
+<!-- Features Section -->
+<section class="features-section">
+    <div class="section-container">
+        <div class="features-grid">
+            <div class="feature-card">
+                <div class="feature-icon">🧑‍🍳</div>
+                <h4>صنع يدوي</h4>
+                <p>كل قطعة تُعدّ بعناية فائقة من قبل طهاتنا المحترفين</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">🌿</div>
+                <h4>مكونات طازجة</h4>
+                <p>نستخدم أجود المكونات الطازجة يومياً بدون مواد حافظة</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">🚀</div>
+                <h4>توصيل سريع</h4>
+                <p>توصيل لجميع أحياء الرياض خلال ساعتين مضمونتين</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">🎁</div>
+                <h4>تغليف فاخر</h4>
+                <p>تغليف هدايا راقٍ مثالي لكل مناسبة وكل موسم</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+{% endblock %}
