@@ -307,6 +307,11 @@ def chart_data():
         data.append({'day': label, 'revenue': round(row['revenue'],2), 'orders': row['orders']})
     conn.close()
     return jsonify(data)
+import os
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    # الحصول على البورت من السيرفر (Render) أو استخدام 5000 كافتراضي للجهاز المحلي
+    port = int(os.environ.get('PORT', 5000))
+    # تشغيل السيرفر مع تحديد الهوست والبورت
+    # debug=True تستخدم فقط في جهازك؛ في السيرفر الحقيقي يفضل وضعها False
+    app.run(host='0.0.0.0', port=port, debug=True)
